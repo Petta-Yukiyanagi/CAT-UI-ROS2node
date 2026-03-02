@@ -7,24 +7,38 @@ float globalScale;
 
 FaceIPC ipc;
 
+// UI設計の基準サイズ（論理解像度）
+static final int BASE_W = 400;
+static final int BASE_H = 300;
+
+// IPC ポーリング制御（無駄に毎フレーム読まない）
+int ipcIntervalMs = 50;   // 20Hz
+int lastIpcTime = 0;
+
 // ==========================
 // setup
 // ==========================
 void setup() {
-  fullScreen();
-  smooth(8);
+  // ★ 画面サイズに自動追従（fullScreen は使わない）
+  size(displayWidth, displayHeight);
 
-  // ★ 正しい IPC ルート（PC依存なし）
+  // ★ 軽量・安定設定
+  frameRate(20);
+  noSmooth();
+
   println("IPC ROOT = " + dataPath("ipc"));
 
-  globalScale = min(width / 400.0, height / 300.0);
+  // ★ スケール計算（モニタが変わってもOK）
+  globalScale = min(
+    width  / (float)BASE_W,
+    height / (float)BASE_H
+  );
 
   character = new Character(this, globalScale);
   textDisplay = new TextDisplay(this, globalScale);
   textDisplay.setAutoAdvance(true, 2.5f);
 
   try {
-    // ★ ここが超重要：絶対に "ipc" を直接渡さない
     ipc = new FaceIPC(dataPath("ipc"));
   } catch (Exception e) {
     e.printStackTrace();
@@ -37,13 +51,23 @@ void setup() {
 void draw() {
   background(0);
 
-  handleIPC();
+  // ★ IPC は一定間隔で読む
+  if (millis() - lastIpcTime > ipcIntervalMs) {
+    handleIPC();
+    lastIpcTime = millis();
+  }
+
+  // ★ UI はスケールして描画
+  pushMatrix();
+  scale(globalScale);
 
   character.update();
   character.draw();
 
   textDisplay.update();
   textDisplay.draw();
+
+  popMatrix();
 }
 
 // ==========================
@@ -106,7 +130,7 @@ void scheduleReset(float seconds) {
 }
 
 // ==========================
-// キー入力（デバッグ用）!
+// キー入力（デバッグ用）
 // ==========================
 void keyPressed() {
   if (key == '1') {
